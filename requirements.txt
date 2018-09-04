@@ -3,6 +3,8 @@ lxml
 selenium
 cssselect
 requests
+requests[socks]
+pysocks
 PyMySql
 sqlalchemy
 aiohttp

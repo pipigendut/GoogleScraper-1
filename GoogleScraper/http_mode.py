@@ -200,7 +200,9 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
         ipinfo = {}
 
         try:
-            text = self.requests.get(self.config.get('proxy_info_url')).text
+            proxy_string = '%s:%s@%s:%s' % (self.proxy.username, self.proxy.password, self.proxy.host, self.proxy.port)
+            proxies = dict(http='http://'+proxy_string, https='https://'+proxy_string)
+            text = self.requests.get(self.config.get('proxy_info_url'), proxies=proxies).text
             try:
                 ipinfo = json.loads(text)
             except ValueError:
@@ -264,8 +266,11 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
             super().detection_prevention_sleep()
             super().keyword_info()
 
+            proxy_string = '%s:%s@%s:%s' % (self.proxy.username, self.proxy.password, self.proxy.host, self.proxy.port)
+            proxies = dict(http='http://'+proxy_string, https='https://'+proxy_string)
+            print(proxy_string)
             request = self.requests.get(self.base_search_url + urlencode(self.search_params),
-                                        headers=self.headers, timeout=timeout)
+                                        headers=self.headers, timeout=timeout, proxies=proxies)
 
             self.requested_at = datetime.datetime.utcnow()
             self.html = request.text
