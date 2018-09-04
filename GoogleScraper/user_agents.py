@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+from user_agent import generate_user_agent
 
 # Several different User-Agents to diversify the requests.
 # Keep the User-Agents updated. Last update: 13th November 2014
@@ -97,7 +98,8 @@ desktop_user_agents = [
 
 
 def random_user_agent(only_desktop=False):
-    if only_desktop:
-        return random.choice(desktop_user_agents)
-
-    return random.choice(user_agents)
+    return generate_user_agent()
+    # if only_desktop:
+    #     return random.choice(desktop_user_agents)
+    #
+    # return random.choice(user_agents)

@@ -6,4 +6,5 @@ requests
 PyMySql
 sqlalchemy
 aiohttp
+user_agent
 # redis
