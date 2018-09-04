@@ -424,7 +424,7 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
                 while True:
                     worker = workers.get()
                     workers.put(worker)
-                    if worker.is_suitabe(job):
+                    if worker.is_suitable(job):
                         worker.add_job(job)
                         break
 

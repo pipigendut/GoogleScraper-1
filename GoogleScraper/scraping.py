@@ -423,7 +423,7 @@ class ScrapeWorkerFactory():
 
         self.jobs = dict()
 
-    def is_suitabe(self, job):
+    def is_suitable(self, job):
 
         return job['scrape_method'] == self.mode and job['search_engine'] == self.search_engine
 
