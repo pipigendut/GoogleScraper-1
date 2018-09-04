@@ -212,7 +212,7 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
         except self.requests.exceptions.RequestException as e:
             status = 'Unknown exception: {}'.format(e)
 
-        if 'ip' in ipinfo and ipinfo['ip']:
+        if 'ip' in ipinfo and ipinfo['ip'] == proxy.host:
             online = True
             status = 'Proxy is working.'
         else:
