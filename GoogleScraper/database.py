@@ -232,7 +232,7 @@ class SearchEngine(Base):
 
 class SearchEngineProxyStatus(Base):
     """Stores last proxy status for the given search engine.
-    
+
     A proxy can either work on a search engine or not.
     """
 

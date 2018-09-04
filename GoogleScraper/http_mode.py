@@ -202,7 +202,7 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
         try:
             proxy_string = '%s:%s@%s:%s' % (self.proxy.username, self.proxy.password, self.proxy.host, self.proxy.port)
             proxies = dict(http='http://'+proxy_string, https='https://'+proxy_string)
-            text = self.requests.get(self.config.get('proxy_info_url'), proxies=proxies).text
+            text = self.requests.get(self.config.get('proxy_info_url'), proxies=proxies, timeout=30).text
             try:
                 ipinfo = json.loads(text)
             except ValueError:
@@ -247,7 +247,7 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
         self.parser = get_parser_by_search_engine(self.search_engine_name)
         self.parser = self.parser(config=self.config)
 
-    def search(self, rand=True, timeout=15):
+    def search(self, rand=True, timeout=30):
         """The actual search for the search engine.
 
         When raising StopScrapingException, the scraper will stop.
