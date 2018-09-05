@@ -5,6 +5,7 @@ import random
 import time
 import os
 import abc
+from itertools import count
 
 from GoogleScraper.proxies import Proxy
 from GoogleScraper.database import db_Proxy
@@ -141,6 +142,8 @@ class SearchEngineScrape(metaclass=abc.ABCMeta):
         'duckduckgo': {}
     }
 
+    _id = count(0)
+
     def __init__(self, config, cache_manager=None, jobs=None, scraper_search=None, session=None, db_lock=None, cache_lock=None,
                  start_page_pos=1, search_engine=None, search_type=None, proxy=None, progress_queue=None):
         """Instantiate an SearchEngineScrape object.
@@ -232,7 +235,7 @@ class SearchEngineScrape(metaclass=abc.ABCMeta):
         self.requested_at = None
 
         # The name of the scraper
-        self.name = '[{}]'.format(self.search_engine_name) + self.__class__.__name__
+        self.name = '[{}]'.format(self.search_engine_name) + self.__class__.__name__ + str(next(self._id))
 
         # How long to sleep (in seconds) after every n-th request
         self.sleeping_ranges = dict()

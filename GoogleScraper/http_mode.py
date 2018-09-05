@@ -256,6 +256,8 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
         """
 
         success = True
+        self.html = ''
+        self.status = 'successful'
 
         self.build_search()
 
@@ -268,7 +270,6 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
 
             proxy_string = '%s:%s@%s:%s' % (self.proxy.username, self.proxy.password, self.proxy.host, self.proxy.port)
             proxies = dict(http='http://'+proxy_string, https='https://'+proxy_string)
-            print(proxy_string)
             request = self.requests.get(self.base_search_url + urlencode(self.search_params),
                                         headers=self.headers, timeout=timeout, proxies=proxies)
 
@@ -284,6 +285,7 @@ class HttpScrape(SearchEngineScrape, threading.Timer):
             self.status = 'Network problem occurred {}'.format(ce)
             success = False
         except self.requests.Timeout as te:
+            # logger.warning('{name}: request timeout'.format(name=self.name))
             self.status = 'Connection timeout {}'.format(te)
             success = False
         except self.requests.exceptions.RequestException as e:
