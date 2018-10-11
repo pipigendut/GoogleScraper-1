@@ -155,7 +155,8 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
         parse_cmd_line: Whether to get options from the command line or not.
         config_from_dict: Configuration that is passed when GoogleScraper is called as library.
     Returns:
-        A database session to the results when return_results is True. Else, nothing.
+        A database session to the results when return_results is True.
+        A status code can be returned.
     """
     external_config_file_path = cmd_line_args = None
 
@@ -170,7 +171,7 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
     if isinstance(config['log_level'], int):
         config['log_level'] = logging.getLevelName(config['log_level'])
 
-    setup_logger(level=config.get('log_level').upper())
+    setup_logger(level=config.get('log_level').upper(), format=config.get('log_format'), logfile=config.get('log_file'))
 
     if config.get('view_config', False):
         print(open(os.path.join(get_base_path(), 'scrape_config.py')).read())
@@ -188,6 +189,14 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
                 os.system('rm {}/*'.format(config.get('cachedir')))
         except:
             pass
+        return
+
+    search_engine_name = config.get('check_detection', None)
+    if search_engine_name:
+        from GoogleScraper.selenium_mode import check_detection
+        code, status = check_detection(config, search_engine_name)
+        logger.debug(status)
+        print(code)
         return
 
     init_outfile(config, force_reload=True)
@@ -287,6 +296,9 @@ def main(return_results=False, parse_cmd_line=True, config_from_dict=None):
 
     if config.get('num_results_per_page') > 100:
         raise WrongConfigurationError('Not more that 100 results per page available for searches.')
+
+    if config.get('num_results_per_page') < 10:
+        raise WrongConfigurationError('num_results_per_page must be 10,20,30,40,50 or 100 with Google and in the range(10,100) with other search engines.')
 
     proxies = []
 

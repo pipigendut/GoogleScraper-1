@@ -257,3 +257,36 @@ https://duo.com/decipher/driving-headless-chrome-with-python
   + Change country/region
   + Change language
   + Change number of search results
+
+
+### 05.09.2018
+
++ Implement reliable google "request denied" detection [Halfway done, more testing required]
+  + Code something that detects when google asks for it's recaptcha v2
+  + Scraping 300 keywords with selenium mode and 5 browser instaces is no problem after initialling inputing a captcha
+  + Test 10 simultaenous browsers and 1000 keywords (50 cities plus suffixes ('best coffee', 'best restaurant', 'best dentist', 'best hairdresser'))
+
++ Integrate captcha solving service such as https://2captcha.com/
++ Look for good captcha solving services such as https://2captcha.com/   
+
+### 07.09.2018
+
++ fix sleeping ranges [DONE]
++ add option to sleep X minutes after N scrapes. [DONE]
+
+
+### 08.09.2018
+ 
++ Parce Google Map Recommondations [DONE]
++ Minimize resouce consumation in selenium scraping with chrome [DONE]
+	- https://stackoverflow.com/questions/49008008/chrome-headless-puppeteer-too-much-cpu
+	- https://news.ycombinator.com/item?id=14103503
+	- https://news.ycombinator.com/item?id=14103503
+	- Its better to use tabs than new instances: https://github.com/GoogleChrome/puppeteer/issues/1569
+
++ Write code that manages X tabs within Y browser instances to yield X*Y scraper instances
+	+ https://blog.phantombuster.com/web-scraping-in-2017-headless-chrome-tips-tricks-4d6521d695e8?gi=7edcb5e70c66
++ Very good article about web scraping in general: https://blog.phantombuster.com/web-scraping-in-2017-headless-chrome-tips-tricks-4d6521d695e8
+
+
++ Add detection check

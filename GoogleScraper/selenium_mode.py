@@ -7,11 +7,13 @@ import json
 import datetime
 import time
 import math
+import random
 import re
 import sys
 import os
 
 try:
+    from fake_useragent import UserAgent
     from selenium import webdriver
     from selenium.common.exceptions import TimeoutException, WebDriverException
     from selenium.common.exceptions import ElementNotVisibleException
@@ -32,6 +34,67 @@ import logging
 
 
 logger = logging.getLogger(__name__)
+
+
+class NotSupportedException(Exception):
+    pass
+
+
+def check_detection(config, search_engine_name):
+    """
+    Checks whether the search engine specified by search_engine_name 
+    blocked us.
+    """
+    status = ''
+    chromedriver = config.get('chromedriver_path', '/usr/bin/chromedriver')
+
+    options = webdriver.ChromeOptions()
+    options.add_argument('headless')
+    options.add_argument('window-size=1200x600')
+
+    browser = webdriver.Chrome(chrome_options=options, executable_path=chromedriver)
+
+    if search_engine_name == 'google': 
+        url = get_base_search_url_by_search_engine(config, 'google', 'selenium')
+        browser.get(url)
+
+        def check(browser, status):
+            needles = SearchEngineScrape.malicious_request_needles['google']
+
+            if needles['inurl'] in browser.current_url and needles['inhtml'] in browser.page_source:
+                status += 'Google is asking for a captcha! '
+                code = 'DETECTED'
+            else:
+                status += 'No captcha prompt detected. '
+                code = 'UNDETECTED'
+
+            return (code, status)
+
+        search_input = None
+        try:
+            search_input = WebDriverWait(browser, 5).until(
+                EC.visibility_of_element_located((By.NAME, 'q')))
+            status += 'Got a search input field. '
+        except TimeoutException:
+            status += 'No search input field located after 5 seconds. '
+            return check(browser, status)
+
+        try:
+            # random query
+            search_input.send_keys('President of Finland'+ Keys.ENTER)
+            status += 'Google Search successful! '
+        except WebDriverException:
+            status += 'Cannot make a google search! '
+            return check(browser, status)
+
+        return check(browser, status)
+
+    else:
+        raise NotImplementedError('Detection check only implemented for Google Right now.')
+
+    browser.quit()
+
+    return status
 
 
 def get_selenium_scraper_by_search_engine_name(config, search_engine_name, *args, **kwargs):
@@ -59,7 +122,7 @@ class SelScrape(SearchEngineScrape, threading.Thread):
 
     next_page_selectors = {
         'google': '#pnnext',
-        'yandex': '.pager__button_kind_next',
+        'yandex': '.pager__item_kind_next',
         'bing': '.sb_pagN',
         'yahoo': '#pg-next',
         'baidu': '.n',
@@ -141,13 +204,52 @@ class SelScrape(SearchEngineScrape, threading.Thread):
         self.captcha_lock = captcha_lock
         self.scrape_method = 'selenium'
 
+        # number of tabs per instance
+        self.number_of_tabs = self.config.get('num_tabs', 1)
+
         self.xvfb_display = self.config.get('xvfb_display', None)
 
         self.search_param_values = self._get_search_param_values()
 
+        self.user_agent = UserAgent()
+
         # get the base search url based on the search engine.
         self.base_search_url = get_base_search_url_by_search_engine(self.config, self.search_engine_name, self.scrape_method)
         super().instance_creation_info(self.__class__.__name__)
+
+
+    def switch_to_tab(self, tab_number):
+        """Switch to tab identified by tab_number
+
+        https://stackoverflow.com/questions/46425797/opening-link-in-the-new-tab-and-switching-between-tabs-selenium-webdriver-pyt
+        https://gist.github.com/lrhache/7686903
+        """
+        assert tab_number < self.number_of_tabs
+
+        first_link = first_result.find_element_by_tag_name('a')
+
+        # Save the window opener (current window, do not mistaken with tab... not the same)
+        main_window = browser.current_window_handle
+
+        # Open the link in a new tab by sending key strokes on the element
+        # Use: Keys.CONTROL + Keys.SHIFT + Keys.RETURN to open tab on top of the stack 
+        first_link.send_keys(Keys.CONTROL + Keys.RETURN)
+
+        # Switch tab to the new tab, which we will assume is the next one on the right
+        browser.find_element_by_tag_name('body').send_keys(Keys.CONTROL + Keys.TAB)
+            
+        # Put focus on current window which will, in fact, put focus on the current visible tab
+        browser.switch_to_window(main_window)
+
+        # do whatever you have to do on this page, we will just got to sleep for now
+        sleep(2)
+
+        # Close current tab
+        browser.find_element_by_tag_name('body').send_keys(Keys.CONTROL + 'w')
+
+        # Put focus on current window which will be the window opener
+        browser.switch_to_window(main_window)
+
 
     def set_proxy(self):
         """Install a proxy on the communication channel."""
@@ -220,10 +322,27 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             chrome_options = webdriver.ChromeOptions()
             chrome_options.binary_location = ""
 
+            # save resouces, options are experimental
+            # See here:
+            # https://news.ycombinator.com/item?id=14103503
+            # https://stackoverflow.com/questions/49008008/chrome-headless-puppeteer-too-much-cpu
+            # https://engineering.21buttons.com/crawling-thousands-of-products-using-aws-lambda-80332e259de1
+            chrome_options.add_argument("test-type")
+            chrome_options.add_argument('--js-flags="--expose-gc --max-old-space-size=500"')
+            chrome_options.add_argument(
+                'user-agent={}'.format(self.user_agent.random))
+            chrome_options.add_argument('--enable-precise-memory-info')
+            chrome_options.add_argument('--disable-default-apps')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--incognito')
+            chrome_options.add_argument('--disable-application-cache')
+
 
             if self.browser_mode == 'headless':
                 chrome_options.add_argument('headless')
-                chrome_options.add_argument('window-size=1200x600') # optional
+                #chrome_options.add_argument('window-size=1200x600') # optional
 
             if self.proxy:
                 chrome_options.add_argument(
@@ -249,9 +368,12 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             options = FirefoxOptions()
             profile = webdriver.FirefoxProfile()
 
+            options.add_argument(
+                'user-agent={}'.format(self.user_agent.random))
+
             if self.browser_mode == 'headless':
                 options.set_headless(headless=True)
-                options.add_argument('window-size=1200x600') # optional
+                #options.add_argument('window-size=1200x600') # optional
 
             if self.proxy:
                 # this means that the proxy is user set, regardless of the type
@@ -304,24 +426,24 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             MaliciousRequestDetected when there was not way to stp Google From denying our requests.
         """
         # selenium webdriver objects have no status code :/
-        super().handle_request_denied('400')
-
         if self.malicious_request_detected():
-            if self.config.get('manual_captcha_solving', False):
-                with self.captcha_lock:
-                    import tempfile
 
-                    tf = tempfile.NamedTemporaryFile('wb')
-                    tf.write(self.webdriver.get_screenshot_as_png())
-                    import webbrowser
-                    webbrowser.open('file://{}'.format(tf.name))
+            super().handle_request_denied('400')
+
+            # only solve when in non headless mode
+            if self.config.get('manual_captcha_solving', False) and self.config.get('browser_mode') != 'headless':
+                with self.captcha_lock:
                     solution = input('Please solve the captcha in the browser! Enter any key when done...')
-                    tf.close()
                     try:
                         self.search_input = WebDriverWait(self.webdriver, 7).until(
                             EC.visibility_of_element_located(self._get_search_input_field()))
                     except TimeoutException:
-                        raise MaliciousRequestDetected('Requesting with this ip is not possible at the moment.')
+                        raise MaliciousRequestDetected('Requesting with this IP address or cookies is not possible at the moment.')
+
+            elif self.config.get('captcha_solving_service', False):
+                # implement request to manual captcha solving service such 
+                # as https://2captcha.com/
+                pass
             else:
                 # Just wait until the user solves the captcha in the browser window
                 # 10 hours if needed :D
@@ -451,7 +573,7 @@ class SelScrape(SearchEngineScrape, threading.Thread):
                 # next page (for example because the search query is to unique)
                 # we need to return false
                 self._save_debug_screenshot()
-                logger.error('{}: Cannot locate next page element: {}'.format(self.name, str(e)))
+                logger.warning('{}: Cannot locate next page element: {}'.format(self.name, str(e)))
                 return False
 
             return self.webdriver.find_element_by_css_selector(selector)
@@ -474,7 +596,7 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             if self.search_engine_name == 'google':
                 selector = '#navcnt td.cur'
             elif self.search_engine_name == 'yandex':
-                selector = '.pager__item_current_yes font font'
+                selector = '.pager__item_current_yes'
             elif self.search_engine_name == 'bing':
                 selector = 'nav li a.sb_pagS'
             elif self.search_engine_name == 'yahoo':
@@ -496,8 +618,7 @@ class SelScrape(SearchEngineScrape, threading.Thread):
             until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, selector), str(self.page_number)))
                 except TimeoutException as e:
                     self._save_debug_screenshot()
-                    content = self.webdriver.find_element_by_css_selector(selector).text
-                    raise Exception('Pagenumber={} did not appear in navigation. Got "{}" instead'.format(self.page_number, content))
+                    logger.warning('Pagenumber={} did not appear in serp. Maybe there is only one result for this query?'.format(self.page_number))
 
         elif self.search_type == 'image':
             self.wait_until_title_contains_keyword()
@@ -556,9 +677,8 @@ class SelScrape(SearchEngineScrape, threading.Thread):
                 self.status = 'Malicious request detected'
                 return
 
-            if self.search_input is False:
-                # @todo: pass status_code
-                self.search_input = self.handle_request_denied()
+            # check if request denied
+            self.handle_request_denied()
 
             if self.search_input:
                 self.search_input.clear()
@@ -700,63 +820,82 @@ class GoogleSelScrape(SelScrape):
         This is highly sensitive.
         """
         super().build_search()
-        # assume we are on the normal google search page right now
-        self.webdriver.get('https://www.google.com/preferences?hl=en')
 
-        time.sleep(1)
+        if self.config.get('google_selenium_search_settings', False):
+            # assume we are on the normal google search page right now
+            self.webdriver.get('https://www.google.com/preferences?hl=en')
 
-        # wait until we see the settings
-        element = WebDriverWait(self.webdriver, 7).until(EC.presence_of_element_located((By.NAME, 'safeui')))
+            time.sleep(random.randint(1,4))
 
-        try:
-            if self.config.get('google_selenium_safe_search', False):
-                if self.webdriver.find_element_by_name('safeui').get_attribute('value') != 'on':
-                    self.webdriver.find_element_by_name('safeui').click()
+            if self.config.get('google_selenium_manual_settings', False):
+                return input('Press any Key after search settings completed...')
+
+
+            oldsize = self.webdriver.get_window_size()
+            self.webdriver.maximize_window()
+
+            # wait until we see the settings
+            element = WebDriverWait(self.webdriver, 7).until(EC.presence_of_element_located((By.NAME, 'safeui')))
 
             try:
-                if self.config.get('google_selenium_personalization', False):
-                    self.webdriver.find_element_by_css_selector('#pson-radio > div:first-child').click()
-                else:
-                    self.webdriver.find_element_by_css_selector('#pson-radio > div:nth-child(2)').click()
+                if self.config.get('google_selenium_safe_search', False):
+                    if self.webdriver.find_element_by_name('safeui').get_attribute('value') != 'on':
+                        self.webdriver.find_element_by_name('safeui').click()
+
+                try:
+                    if self.config.get('google_selenium_personalization', False):
+                        self.webdriver.find_element_by_css_selector('#pson-radio > div:first-child').click()
+                    else:
+                        self.webdriver.find_element_by_css_selector('#pson-radio > div:nth-child(2)').click()
+                except WebDriverException as e:
+                    logger.warning('Cannot set personalization settings.')
+
+                time.sleep(random.randint(1,4))
+
+                # set the region
+                try:
+                    self.webdriver.find_element_by_id('regionanchormore').click()
+                except WebDriverException as e:
+                    logger.warning('Regions probably already expanded.')
+
+                try:
+                    region = self.config.get('google_selenium_region', 'US')
+                    self.webdriver.find_element_by_css_selector('div[data-value="{}"]'.format(region)).click()
+                except WebDriverException as e:
+                    logger.warning('Cannot set region settings.')
+
+                # set the number of results
+                try:
+                    num_results = self.config.get('google_selenium_num_results', 10)
+                    self.webdriver.find_element_by_id('result_slider').click()
+                    # reset
+                    for i in range(5):
+                        self.webdriver.find_element_by_id('result_slider').send_keys(Keys.LEFT)
+                    # move to desicred result
+                    for i in range((num_results//10)-1):
+                        time.sleep(.25)
+                        self.webdriver.find_element_by_id('result_slider').send_keys(Keys.RIGHT)
+                except WebDriverException as e:
+                    logger.warning('Cannot set number of results settings.')
+
+                time.sleep(random.randint(1,4))
+
+                # save settings
+                self.webdriver.find_element_by_css_selector('#form-buttons div:first-child').click()
+                time.sleep(1)
+                # accept alert
+                self.webdriver.switch_to.alert.accept()
+
+                time.sleep(random.randint(1,4))
+
+                self.handle_request_denied()
+
             except WebDriverException as e:
-                logger.warning('Cannot set personalization settings.')
+                logger.error('Unable to set google page settings')
+                wait = input('waiting...')
+                raise e
 
-            time.sleep(1)
-
-            # set the region
-            try:
-                self.webdriver.find_element_by_id('regionanchormore').click()
-            except WebDriverException as e:
-                logger.warning('Regions probably already expanded.')
-
-            region = self.config.get('google_selenium_region', 'US')
-            self.webdriver.find_element_by_css_selector('div[data-value="{}"]'.format(region)).click()
-
-            # set the number of results
-            num_results = self.config.get('google_selenium_num_results', 10)
-            self.webdriver.find_element_by_id('result_slider').click()
-            # reset
-            for i in range(5):
-                self.webdriver.find_element_by_id('result_slider').send_keys(Keys.LEFT)
-            # move to desicred result
-            for i in range((num_results//10)-1):
-                time.sleep(.25)
-                self.webdriver.find_element_by_id('result_slider').send_keys(Keys.RIGHT)
-
-            time.sleep(1)
-
-            # save settings
-            self.webdriver.find_element_by_css_selector('#form-buttons div:first-child').click()
-            # accept alert
-            self.webdriver.switch_to.alert.accept()
-
-            time.sleep(2)
-
-            self.handle_request_denied()
-
-        except WebDriverException as e:
-            logger.error(e)
-            raise e
+            driver.set_window_size(oldsize['width'], oldsize['height'])
 
 
 class DuckduckgoSelScrape(SelScrape):

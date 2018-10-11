@@ -7,7 +7,6 @@ import lxml.html
 from lxml.html.clean import Cleaner
 from urllib.parse import unquote
 import pprint
-from GoogleScraper.database import SearchEngineResultsPage
 import logging
 from cssselect import HTMLTranslator
 
@@ -69,7 +68,7 @@ class Parser():
     # If you didn't specify the search type in the search_types list, this attribute
     # will not be evaluated and no data will be parsed.
 
-    def __init__(self, config={}, html='', query=''):
+    def __init__(self, search_type='normal', html='', query=''):
         """Create new Parser instance and parse all information.
 
         Args:
@@ -81,8 +80,7 @@ class Parser():
             Assertion error if the subclassed
             specific parser cannot handle the the settings.
         """
-        self.config = config
-        self.searchtype = self.config.get('search_type', 'normal')
+        self.searchtype = search_type
         assert self.searchtype in self.search_types, 'search type "{}" is not supported in {}'.format(
             self.searchtype,
             self.__class__.__name__
@@ -1040,7 +1038,7 @@ def get_parser_by_search_engine(search_engine):
         raise NoParserForSearchEngineException('No such parser for "{}"'.format(search_engine))
 
 
-def parse_serp(config, html=None, parser=None, scraper=None, search_engine=None, query=''):
+def parse_serp(html='', query='', search_engine='google'):
     """Store the parsed data in the sqlalchemy session.
 
     If no parser is supplied then we are expected to parse again with
@@ -1056,22 +1054,11 @@ def parse_serp(config, html=None, parser=None, scraper=None, search_engine=None,
         The parsed SERP object.
     """
 
-    if not parser and html:
-        parser = get_parser_by_search_engine(search_engine)
-        parser = parser(config, query=query)
-        parser.parse(html)
+    parser = get_parser_by_search_engine(search_engine)
+    parser = parser(html=html, query=query)
+    parser.parse(html)
 
-    serp = SearchEngineResultsPage()
-
-    if query:
-        serp.query = query
-
-    if parser:
-        serp.set_values_from_parser(parser)
-    if scraper:
-        serp.set_values_from_scraper(scraper)
-
-    return serp
+    return parser.search_results
 
 
 if __name__ == '__main__':
@@ -1098,7 +1085,7 @@ if __name__ == '__main__':
         raw_html = requests.get(url).text
         parser = get_parser_by_url(url)
 
-    parser = parser(raw_html)
+    parser = parser(html=raw_html)
     parser.parse()
     print(parser)
 

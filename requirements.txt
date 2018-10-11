@@ -8,5 +8,7 @@ pysocks
 PyMySql
 sqlalchemy
 aiohttp
+fake_useragent
+recommonmark
 user_agent
 # redis
