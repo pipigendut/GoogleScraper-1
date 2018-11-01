@@ -154,8 +154,8 @@ class SearchEngineResultsPage(Base):
         self.scrape_method = scraper.scrape_method
         self.page_number = scraper.page_number
         self.requested_at = scraper.requested_at
-        # self.requested_by = scraper.requested_by
-        self.requested_by = scraper.name
+        self.requested_by = scraper.requested_by
+#         self.requested_by = scraper.name
         self.status = scraper.status
 
     def was_correctly_requested(self):
