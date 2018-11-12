@@ -357,7 +357,7 @@ class GoogleParser(Parser):
                 'result_container': 'div.g ',
                 'link': 'div.r a::attr(href)',
                 'snippet': 'div.s span.st::text',
-                'title': 'div.r > a:first-child::text',
+                'title': '',
                 'visible_link': 'cite::text'
             },
             'de_ip': {
@@ -365,7 +365,7 @@ class GoogleParser(Parser):
                 'result_container': 'li.g ',
                 'link': 'div.r a::attr(href)',
                 'snippet': 'div.s span.st::text',
-                'title': 'div.r > a:first-child::text',
+                'title': '',
                 'visible_link': 'cite::text'
             },
             'de_ip_news_items': {
